@@ -10,7 +10,7 @@ export interface OrderData {
   order_status: 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled' | 'failed';
   razorpay_payment_id?: string;
   razorpay_order_id?: string;
-  order_number?: string;
+  order_number?: string | null;
   created_at: string;
   order_items?: OrderItem[];
   address?: OrderAddress;

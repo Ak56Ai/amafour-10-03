@@ -49,7 +49,7 @@ export class OrderService {
       // Generate order number for COD orders
       const orderNumber = orderData.payment_method === 'cod' 
         ? `RM${Date.now().toString().slice(-8)}` 
-        : undefined;
+        : null;
       
       const orderPayload = {
         user_id: orderData.user_id,
@@ -60,7 +60,7 @@ export class OrderService {
         shipping_method: orderData.shipping_method || 'standard',
         payment_status: 'pending' as const,
         order_status: 'processing' as const,
-        ...(orderNumber && { order_number: orderNumber })
+        order_number: orderNumber
       };
 
       console.log('[Order] Inserting order payload:', orderPayload);
@@ -155,20 +155,19 @@ export class OrderService {
         .from('orders')
         .update(updatePayload)
         .eq('id', orderId)
-        .select('*')
-        .single();
+        .select('*');
 
       if (error) {
         console.error('[Order] Supabase error updating order payment:', error);
         throw new Error(`Failed to update order payment: ${error.message}`);
       }
 
-      if (!data) {
+      if (!data || data.length === 0) {
         console.error('[Order] No order found with ID:', orderId);
         throw new Error('Order not found');
       }
 
-      console.log('[Order] Order payment updated successfully:', data);
+      console.log('[Order] Order payment updated successfully:', data[0]);
     } catch (error) {
       console.error('[Order] Error in updateOrderPayment:', error);
       throw error;

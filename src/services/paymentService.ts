@@ -149,7 +149,10 @@ export class PaymentService {
               console.error('[Payment] Error marking order as failed:', markFailedError);
             }
             
-            await options.onError(error);
+            // Don't call onError here as payment was successful
+            // Just log the error and continue with success flow
+            console.error('[Payment] Database update failed but payment succeeded');
+            await options.onSuccess(response);
           }
         },
         prefill: {

@@ -178,15 +178,28 @@ const OrderSuccessPage: React.FC = () => {
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Payment Status</h3>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
-                {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
-              </span>
+              <div className="space-y-1">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
+                  {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+                </span>
+                {order.razorpay_payment_id && (
+                  <p className="text-xs text-gray-600">Payment ID: {order.razorpay_payment_id}</p>
+                )}
+              </div>
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Order Status</h3>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOrderStatusColor(order.order_status)}`}>
-                {order.order_status.charAt(0).toUpperCase() + order.order_status.slice(1)}
-              </span>
+              <div className="space-y-1">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOrderStatusColor(order.order_status)}`}>
+                  {order.order_status.charAt(0).toUpperCase() + order.order_status.slice(1)}
+                </span>
+                {order.payment_method === 'razorpay' && order.razorpay_order_id && (
+                  <p className="text-xs text-gray-600">Razorpay Order: {order.razorpay_order_id}</p>
+                )}
+                {order.payment_method === 'cod' && order.order_number && (
+                  <p className="text-xs text-gray-600">Order Number: {order.order_number}</p>
+                )}
+              </div>
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Order Date</h3>

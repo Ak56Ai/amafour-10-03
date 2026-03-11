@@ -9,12 +9,22 @@ const AccountDashboard: React.FC = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const ORDERS_PER_PAGE = 10;
 
   useEffect(() => {
     if (user) {
       fetchUserData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (userProfile) {
+      fetchOrders(currentPage);
+    }
+  }, [userProfile, currentPage]);
 
   const fetchUserData = async () => {
     try {
@@ -41,6 +51,34 @@ const AccountDashboard: React.FC = () => {
       console.error('Error fetching user data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOrders = async (page: number) => {
+    try {
+      if (!userProfile?.id) return;
+
+      const start = (page - 1) * ORDERS_PER_PAGE;
+      const end = start + ORDERS_PER_PAGE - 1;
+
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      const { data, count, error } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact' })
+        .eq('user_id', userProfile.id)
+        .gte('created_at', ninetyDaysAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .range(start, end);
+
+      if (error) throw error;
+
+      setOrders(data || []);
+      setTotalOrders(count || 0);
+
+    } catch (error) {
+      console.error('Error fetching orders:', error);
     }
   };
 
@@ -128,54 +166,94 @@ const AccountDashboard: React.FC = () => {
                   View all orders
                 </Link>
               </div>
-              
-              {recentOrders.length > 0 ? (
-                <div className="space-y-4">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            Order #{order.razorpay_order_id || order.order_number || order.id.slice(0, 8).toUpperCase()}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            Placed on {new Date(order.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">
-                            {new Intl.NumberFormat('en-IN', {
-                              style: 'currency',
-                              currency: 'INR',
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            }).format(order.total_amount)}
-                          </p>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            order.order_status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                            order.order_status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                            order.order_status === 'failed' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {order.order_status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
+
+              {orders.length === 0 ? (
                 <div className="text-center py-8">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No orders yet</h3>
                   <p className="text-gray-600 mb-4">When you place your first order, it will appear here.</p>
                   <Link
                     to="/"
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700"
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
                   >
                     Start Shopping
                   </Link>
                 </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    {orders.map((order) => (
+                      <div key={order.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              Order #{order.order_number || order.id.slice(0,8).toUpperCase()}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Placed on {new Date(order.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-900">
+                              {new Intl.NumberFormat('en-IN', {
+                                style: 'currency',
+                                currency: 'INR',
+                                minimumFractionDigits: 0
+                              }).format(order.total_amount)}
+                            </p>
+
+                            <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                              {order.order_status}
+                            </span>
+                          </div>
+
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  {totalOrders > ORDERS_PER_PAGE && (
+                    <div className="flex justify-center mt-6 space-x-2">
+
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        className="px-3 py-1 border rounded disabled:opacity-50"
+                      >
+                        Prev
+                      </button>
+
+                      {Array.from(
+                        { length: Math.ceil(totalOrders / ORDERS_PER_PAGE) },
+                        (_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setCurrentPage(i + 1)}
+                            className={`px-3 py-1 border rounded ${
+                              currentPage === i + 1
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-white'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        disabled={currentPage === Math.ceil(totalOrders / ORDERS_PER_PAGE)}
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        className="px-3 py-1 border rounded disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
