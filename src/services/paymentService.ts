@@ -122,6 +122,7 @@ export class PaymentService {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: amountInPaise,
         currency: options.currency,
+        order_id: options.orderId, 
         name: options.name,
         description: options.description,
         handler: async (response: RazorpayResponse) => {

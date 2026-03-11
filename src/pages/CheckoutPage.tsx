@@ -168,82 +168,135 @@ const CheckoutPage: React.FC = () => {
 
   const handleRazorpayPayment = async () => {
     console.log('[Checkout] Starting Razorpay payment process');
-    
-    if (processingOrder) {
-      console.log('[Checkout] Order already processing, ignoring request');
-      return;
-    }
+
+    if (processingOrder) return;
 
     try {
       setLoading(true);
       setProcessingOrder(true);
 
-      // Create order in database
+      // 1️⃣ Create order in DB
       const orderId = await createOrder();
-      if (!orderId) {
-        throw new Error('Failed to create order');
-      }
+      if (!orderId) throw new Error("Order creation failed");
 
-      // Add order items
+      // 2️⃣ Add items
       await addOrderItems(orderId);
 
-      // Open Razorpay checkout
+      // 3️⃣ Create Razorpay order
+      const { data, error } = await supabase.functions.invoke(
+        "create-razorpay-order",
+        {
+          body: {
+            amount: total * 100,
+            receipt: orderId
+          }
+        }
+      );
+
+      if (error || !data?.id) {
+        throw new Error("Failed to create Razorpay order");
+      }
+
+      const razorpayOrderId = data.id;
+
+      // 4️⃣ Save Razorpay order ID
+      await supabase
+        .from("orders")
+        .update({ razorpay_order_id: razorpayOrderId })
+        .eq("id", orderId);
+
+      console.log("[Checkout] Razorpay order:", razorpayOrderId);
+
+      // 5️⃣ Open checkout
       await PaymentService.openRazorpayCheckout({
-        orderId: orderId,
-        amount: total,
-        currency: 'INR',
-        name: 'RegionalMart',
-        description: 'Order Payment',
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+
+        orderId: razorpayOrderId,
+        amount: total * 100,
+        currency: "INR",
+
+        name: "RegionalMart",
+        description: "Order Payment",
+
         prefill: {
           name: `${userProfile?.first_name} ${userProfile?.last_name}`,
-          email: userProfile?.email || '',
-          contact: userProfile?.mobile || ''
+          email: userProfile?.email || "",
+          contact: userProfile?.mobile || ""
         },
 
         onSuccess: async (response) => {
-          console.log('[Checkout] Payment successful:', response);
+          console.log("[Checkout] Payment success", response);
 
-          const paymentId = response?.razorpay_payment_id;
-
-          if (!paymentId) {
-            alert('Payment verification failed.');
+          if (
+            !response?.razorpay_payment_id ||
+            !response?.razorpay_order_id ||
+            !response?.razorpay_signature
+          ) {
+            alert("Payment verification failed.");
             return;
           }
 
           try {
-            await OrderService.markOrderPaid(orderId, paymentId);
+            // Verify payment
+            const verify = await supabase.functions.invoke(
+              "verify-razorpay-payment",
+              {
+                body: {
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                  order_id: orderId
+                }
+              }
+            );
+
+            if (verify.error) {
+              throw new Error("Verification failed");
+            }
+
+            // Update order
+            await supabase
+            .from("orders")
+            .update<any>({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              payment_status: "paid",
+              order_status: "confirmed"
+            })
+              .eq("id", orderId)
+              .eq("payment_status", "pending");
 
             await clearCart();
 
             navigate(`/order-success/${orderId}`);
 
-          } catch (error) {
-            console.error('[Checkout] Order update failed', error);
-            alert('Payment successful but order update failed. Contact support.');
+          } catch (err) {
+            console.error("Order update failed", err);
+            alert("Payment successful but verification failed.");
           }
         },
 
         onError: async (error) => {
-          console.error('[Checkout] Payment failed:', error);
+          console.error("[Checkout] Payment failed:", error);
 
           try {
             await OrderService.markOrderFailed(orderId);
           } catch (err) {
-            console.error('Failed to mark order as failed', err);
+            console.error("Failed to mark order failed", err);
           }
 
-          alert('Payment failed. Please try again.');
+          alert("Payment failed. Try again.");
         },
 
         onDismiss: () => {
-          console.log('[Checkout] Payment dismissed by user');
+          console.log("[Checkout] Razorpay closed");
           setProcessingOrder(false);
         }
       });
-      
+
     } catch (error) {
-      console.error('[Checkout] Error processing payment:', error);
-      alert('Payment failed. Please try again.');
+      console.error("[Checkout] Payment error:", error);
+      alert("Payment could not be processed.");
     } finally {
       setLoading(false);
       setProcessingOrder(false);

@@ -10,6 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export type Database = {
   public: {
     Tables: {
+
       users: {
         Row: {
           id: string;
@@ -38,7 +39,8 @@ export type Database = {
           mobile?: string | null;
           updated_at?: string;
         };
-      };
+      },
+
       user_addresses: {
         Row: {
           id: string;
@@ -76,7 +78,62 @@ export type Database = {
           pincode?: string;
           is_default?: boolean;
         };
+      },
+
+      // ⭐ ADD THIS TABLE
+      orders: {
+        Row: {
+          id: string;
+          user_id: string;
+          address_id: string;
+          total_amount: number;
+          payment_status: string;
+          order_status: string;
+          created_at: string;
+          shipping_method: string | null;
+          shipping_cost: number | null;
+          shiprocket_order_id: string | null;
+          shiprocket_shipment_id: string | null;
+          tracking_number: string | null;
+          razorpay_order_id: string | null;
+          razorpay_payment_id: string | null;
+          razorpay_signature: string | null;
+          payment_method: string | null;
+          estimated_delivery_date: string | null;
+          stripe_payment_intent_id: string | null;
+          order_number: string | null;
+        };
+
+        Insert: {
+          id?: string;
+          user_id: string;
+          address_id: string;
+          total_amount: number;
+          payment_status?: string;
+          order_status?: string;
+          created_at?: string;
+          shipping_method?: string | null;
+          shipping_cost?: number | null;
+          razorpay_order_id?: string | null;
+          razorpay_payment_id?: string | null;
+          razorpay_signature?: string | null;
+          payment_method?: string | null;
+          order_number?: string | null;
+        };
+
+        Update: {
+          razorpay_order_id?: string | null;
+          razorpay_payment_id?: string | null;
+          razorpay_signature?: string | null;
+          payment_status?: string;
+          order_status?: string;
+          shiprocket_order_id?: string | null;
+          shiprocket_shipment_id?: string | null;
+          tracking_number?: string | null;
+          estimated_delivery_date?: string | null;
+        };
       };
+
     };
   };
 };
