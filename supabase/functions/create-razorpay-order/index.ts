@@ -142,7 +142,7 @@ serve(async (req) => {
       .from('payment_idempotency')
       .insert({
         idempotency_key: idempotencyKey,
-        request_hash: JSON.stringify({ cartItems, userId, addressId }),
+        request_hash: JSON.stringify({ cartItems, userId, addressId }), 
         response_data: responseData,
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000)
       });
