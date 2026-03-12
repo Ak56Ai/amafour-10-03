@@ -3,15 +3,28 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Razorpay from "https://esm.sh/razorpay@2.9.2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
   try {
-    const { 
-      cartItems, 
-      userId, 
-      addressId, 
+    const {
+      cartItems,
+      userId,
+      addressId,
       shippingMethod,
       idempotencyKey,
-      timestamp 
+      timestamp
     } = await req.json();
 
     const supabaseClient = createClient(
@@ -28,13 +41,16 @@ serve(async (req) => {
 
     if (existingRequest) {
       console.log('Replay attempt detected for key:', idempotencyKey);
-      
+
       // If within 24 hours and same request, return existing response
       const timeDiff = Date.now() - new Date(existingRequest.created_at).getTime();
       if (timeDiff < 24 * 60 * 60 * 1000) {
         return new Response(
           JSON.stringify(existingRequest.response_data),
-          { status: 200 }
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
         );
       }
     }
@@ -46,7 +62,12 @@ serve(async (req) => {
     for (const item of cartItems) {
       const { data: variant, error } = await supabaseClient
         .from('product_variants')
-        .select('price, product_id, sku')
+        .select(`
+          id,
+          product_id,
+          sku,
+          pricing:product_pricing(effective_price)
+        `)
         .eq('id', item.variant_id)
         .single();
 
@@ -54,11 +75,12 @@ serve(async (req) => {
         throw new Error(`Invalid variant: ${item.variant_id}`);
       }
 
-      total += variant.price * item.quantity;
+      const price = variant.pricing?.[0]?.effective_price || item.price;
+      total += price * item.quantity;
       orderItems.push({
         variant_id: item.variant_id,
         quantity: item.quantity,
-        price: variant.price,
+        price: price,
         sku: variant.sku
       });
     }
@@ -127,13 +149,20 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(responseData),
-      { status: 200 }
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
     );
-    
+
   } catch (error) {
+    console.error('[Create Razorpay Order] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500 }
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
     );
   }
 });
